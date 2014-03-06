@@ -17,13 +17,16 @@
 
 #define STACK_SIZE 1024
 
-#define PRIO_UPDATE_PWM		10
-#define PRIO_DECODER_ERROR	20
+#define PRIO_UPDATE_PWM			10
+#define PRIO_DECODER_ERROR		20
+#define PRIO_CALCULATE_SPEED	30
 
  #include "stdint.h"
 
 static unsigned int stk_update_pwm[STACK_SIZE];
 static unsigned int stk_decoder_error[STACK_SIZE];
+static unsigned int stk_calculate_speed[STACK_SIZE];
+
 
 uint16_t throttle;
 uint16_t speed;

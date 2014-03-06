@@ -12,18 +12,18 @@ void    isr_buttons(void)
 
         switch (X32_BUTTONS){
         	case 0x01: //INCREMENT THROTTLE
-        		throttle++;
+        		throttle+=5;
                 //printf("increment throttle\r\n");
         	break;
         	case 0x02: //DECREMENT THROTTLE
-        		throttle--;
+        		throttle-=5;
                 //printf("decrement throttle\r\n");
         	break;         	        	
         	case 0x04: //DISENGAGE
         	break;       	
         	case 0x08: //RESET
         		DISABLE_INTERRUPT(INTERRUPT_GLOBAL);
-                //printf("regular exit\r\n");
+                printf("regular exit\r\n");
                 exit(0);
         	break;
         	default:
@@ -66,9 +66,10 @@ void update_pwm(void *data) {
 	while(TRUE) {		
 		//PROTECT THROTTLE consistency -MISSING-
 		X32_PWM_WIDTH = throttle;
-
-
-		X32_DISPLAY = (speed<<8)&&(throttle);
+		//printf("pwm_period = %d\r\n",X32_PWM_PERIOD);
+		//printf("pwm_width = %d\r\n",X32_PWM_WIDTH);
+		X32_DISPLAY = (speed<<8)|(throttle>>2);
+		//printf("speed = %d\r\n",speed);
 		//printf("Throttle: %d\n", throttle);
 		//printf("Speed: %d\n", speed);
 		OSTimeDly(1);
@@ -81,6 +82,15 @@ void decoder_error(void *data) {
 		X32_LEDS = (X32_LEDS | 0x80);
 		OSTimeDly(5);
 		X32_LEDS = (X32_LEDS & 0x7f);
+	}
+}
+
+void calculate_speed(void *data) {
+	while(TRUE) {	
+		speed = dec_count;
+		//speed = speed>>4;
+		dec_count = 0;
+		OSTimeDly(5);
 	}
 }
 
@@ -103,10 +113,10 @@ void main()
     SET_INTERRUPT_PRIORITY(INTERRUPT_BUTTONS, 10);
 
     SET_INTERRUPT_VECTOR(INTERRUPT_ENGINE_A, &isr_decoder);
-    SET_INTERRUPT_PRIORITY(INTERRUPT_ENGINE_A, 30);
+    SET_INTERRUPT_PRIORITY(INTERRUPT_ENGINE_A, 11);
 
     SET_INTERRUPT_VECTOR(INTERRUPT_ENGINE_B, &isr_decoder);
-    SET_INTERRUPT_PRIORITY(INTERRUPT_ENGINE_B, 30);
+    SET_INTERRUPT_PRIORITY(INTERRUPT_ENGINE_B, 11);
 
     ENABLE_INTERRUPT(INTERRUPT_ENGINE_A);
     ENABLE_INTERRUPT(INTERRUPT_ENGINE_B);
@@ -119,6 +129,7 @@ void main()
 	sem_error = OSSemCreate(0);
 	OSTaskCreate(update_pwm, (void *)1024, (void *)stk_update_pwm, PRIO_UPDATE_PWM);
 	OSTaskCreate(decoder_error, (void *)0, (void *)stk_decoder_error, PRIO_DECODER_ERROR);
+	OSTaskCreate(calculate_speed, (void *)0, (void *)stk_calculate_speed, PRIO_CALCULATE_SPEED);
 	/*Initialize rtos*/
 	OSStart();
 }
