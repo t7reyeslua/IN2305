@@ -21,13 +21,23 @@
 #define PRIO_DECODER_ERROR		20
 #define PRIO_CALCULATE_SPEED	30
 
+#define PRIO_BUTTON_INC			32
+#define PRIO_BUTTON_DEC			33
+#define PRIO_BUTTON_ENG			34
+#define PRIO_BUTTON_RES			35
+
  #include "stdint.h"
 
 static unsigned int stk_update_pwm[STACK_SIZE];
 static unsigned int stk_decoder_error[STACK_SIZE];
 static unsigned int stk_calculate_speed[STACK_SIZE];
 
+static unsigned int stk_button_res[STACK_SIZE];
+static unsigned int stk_button_eng[STACK_SIZE];
+static unsigned int stk_button_inc[STACK_SIZE];
+static unsigned int stk_button_dec[STACK_SIZE];
 
+unsigned char err;
 uint16_t throttle;
 uint16_t speed;
 int dec_count;
@@ -35,5 +45,9 @@ char new_a, new_b;
 char state_a, state_b;
 
 OS_EVENT *sem_error;
+OS_EVENT *sem_button_inc;
+OS_EVENT *sem_button_dec;
+OS_EVENT *sem_button_eng;
+OS_EVENT *sem_button_res;
 
  #endif      /* __IN2305_CC__ */
