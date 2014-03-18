@@ -12,11 +12,11 @@ void    isr_buttons(void)
 
         switch (X32_BUTTONS){
         	case 0x01: //INCREMENT THROTTLE
-        		throttle+=5;
+                throttle += 16;
                 //printf("increment throttle\r\n");
         	break;
         	case 0x02: //DECREMENT THROTTLE
-        		throttle-=5;
+                throttle -= 16;
                 //printf("decrement throttle\r\n");
         	break;         	        	
         	case 0x04: //DISENGAGE
@@ -63,13 +63,11 @@ void isr_decoder() {
 
 void update_pwm(void *data) {
 	X32_PWM_PERIOD = (int)data;
-	while(TRUE) {		
-		//PROTECT THROTTLE consistency -MISSING-
+    while(TRUE) {
 		X32_PWM_WIDTH = throttle;
+        X32_DISPLAY = (speed<<4)|(throttle>>4);
 		//printf("pwm_period = %d\r\n",X32_PWM_PERIOD);
-		//printf("pwm_width = %d\r\n",X32_PWM_WIDTH);
-		X32_DISPLAY = (speed<<8)|(throttle>>2);
-		//printf("speed = %d\r\n",speed);
+        //printf("pwm_width = %d\r\n",X32_PWM_WIDTH);
 		//printf("Throttle: %d\n", throttle);
 		//printf("Speed: %d\n", speed);
 		OSTimeDly(1);
