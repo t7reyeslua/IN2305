@@ -34,77 +34,65 @@ void    isr_buttons(void)
 }
 
 /*------------------------------------------------------------------
- * isr_decoder -- software decoder for signals a and b
- * isr for channel ’a’ and ’b’ int new_a, new_b
+ * Engine_error
  *------------------------------------------------------------------
  */
-void isr_decoder() {
-	OSIntEnter();
-	new_a = peripherals[PERIPHERAL_ENGINE_A];
-	new_b = peripherals[PERIPHERAL_ENGINE_B];
-	
-	
-	if(new_a != state_a && new_b != state_b) {	// both signals have changed: error
-		X32_LEDS = (X32_LEDS | 0x80);
-		OSSemPost(sem_error);			
-		//printf("post error\r\n");
-	}
-	else if(new_a == 1 && new_b == 1) {			// both signals are high: update up/down counter
-		if(state_b == 0) 
-			dec_count++;	// b signal comes later: positive direction
-		else 
-			dec_count--;	// a signal comes later: negative direction
-	}
-
-	//update state
-	state_a = new_a;
-	state_b = new_b;
-	OSIntExit();
-}
-
-
-void update_pwm(void *data) {
-	X32_PWM_PERIOD = (int)data;
-	while(TRUE) {		
-		//PROTECT THROTTLE consistency -MISSING-
-		X32_PWM_WIDTH = throttle;
-		//printf("pwm_period = %d\r\n",X32_PWM_PERIOD);
-		//printf("pwm_width = %d\r\n",X32_PWM_WIDTH);
-		X32_DISPLAY = (speed<<8)|(throttle);
-		//printf("speed = %d\r\n",speed);
-		//printf("Throttle: %d\n", throttle);
-		//printf("Speed: %d\n", speed);
-		OSTimeDly(1);
-	}
+void isr_engine_error() {
+    OSIntEnter();
+    OSSemPost(sem_error);
+    OSIntExit();
 }
 
 void decoder_error(void *data) {
-	while(TRUE) {			
-		OSSemPend(sem_error, WAIT_FOREVER, &err);
-		//printf("pend error\r\n");
-		while(OSSemAccept(sem_error) > 0);
-		//X32_LEDS = (X32_LEDS | 0x80);
-		OSTimeDly(5);
-		X32_LEDS = (X32_LEDS & 0x7F);
-	}
+    while(TRUE) {
+        OSSemPend(sem_error, WAIT_FOREVER, &err);
+        //printf("pend error\r\n");
+        while(OSSemAccept(sem_error) > 0);
+        //X32_LEDS = (X32_LEDS | 0x80);
+        OSTimeDly(5);
+        X32_LEDS = (X32_LEDS & 0x7F);
+    }
+}
+
+/*------------------------------------------------------------------
+ * Speed calculations
+ *------------------------------------------------------------------
+ */
+void update_pwm(void *data) {
+    X32_PWM_PERIOD = (int)data;
+    while(TRUE) {
+            int s = (speed<<4) & 0xff00;
+            X32_PWM_WIDTH = throttle;
+            if (X32_SWITCHES == 0x00){
+                X32_DISPLAY = (s)|(throttle>>4);
+            }else if (X32_SWITCHES == 0x01){
+                X32_DISPLAY = (speed);
+            }else{
+                X32_DISPLAY = (throttle);
+            }
+            OSTimeDly(1);
+       }
 }
 
 void calculate_speed(void *data) {
 	while(TRUE) {	
-		speed = dec_count;
-		//speed = speed>>4;
-		dec_count = 0;
-		OSTimeDly(5);
-	}
+        speed = X32_DECODER - prev_decoder;
+        prev_decoder = X32_DECODER;
+        OSTimeDly(5);
+     }
 }
 
+/*------------------------------------------------------------------
+ * parallel debouncing of buttons --
+ *------------------------------------------------------------------
+ */
 void button_inc(void *data) {
 	while(TRUE) {
 		OSSemPend(sem_button_inc, WAIT_FOREVER, &err);		
 		OSTimeDly(10);
 		//printf("task button\r\n");
 		while(OSSemAccept(sem_button_inc) > 0);
-		throttle+=10;
+        throttle += DELTA_MOTOR;
 		//printf("increment throttle\r\n");
 	}
 }
@@ -114,7 +102,7 @@ void button_dec(void *data) {
 		OSSemPend(sem_button_dec, WAIT_FOREVER, &err);		
 		OSTimeDly(10);
 		while(OSSemAccept(sem_button_dec) > 0);
-		throttle-=10;
+        throttle -= DELTA_MOTOR;
 	}
 }
 
@@ -148,22 +136,20 @@ void main()
 	throttle = 0;
 	dec_count = 0;
 	speed = 0;
+    prev_decoder = 0;
+
 	/* x32 section********************************/
 	
-	/**Define x32 ISR vectors, prioritie,etc.*/
+    /**Define x32 ISR vectors, priorities,etc.*/
 	DISABLE_INTERRUPT(INTERRUPT_GLOBAL);
 
 	SET_INTERRUPT_VECTOR(INTERRUPT_BUTTONS, &isr_buttons);
     SET_INTERRUPT_PRIORITY(INTERRUPT_BUTTONS, 10);
 
-    SET_INTERRUPT_VECTOR(INTERRUPT_ENGINE_A, &isr_decoder);
-    SET_INTERRUPT_PRIORITY(INTERRUPT_ENGINE_A, 11);
+    SET_INTERRUPT_VECTOR(INTERRUPT_ENGINE_ERROR, &isr_engine_error);
+    SET_INTERRUPT_PRIORITY(INTERRUPT_ENGINE_ERROR, 11);
 
-    SET_INTERRUPT_VECTOR(INTERRUPT_ENGINE_B, &isr_decoder);
-    SET_INTERRUPT_PRIORITY(INTERRUPT_ENGINE_B, 11);
-
-    ENABLE_INTERRUPT(INTERRUPT_ENGINE_A);
-    ENABLE_INTERRUPT(INTERRUPT_ENGINE_B);
+    ENABLE_INTERRUPT(INTERRUPT_ENGINE_ERROR);
     ENABLE_INTERRUPT(INTERRUPT_BUTTONS);
 
 

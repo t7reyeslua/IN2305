@@ -14,8 +14,11 @@
 #define X32_DECODER				peripherals[PERIPHERAL_ENGINE_DECODED]
 #define X32_PWM_PERIOD 			peripherals[PERIPHERAL_DPC1_PERIOD]
 #define X32_PWM_WIDTH  			peripherals[PERIPHERAL_DPC1_WIDTH]
+#define X32_SWITCHES  			peripherals[PERIPHERAL_SWITCHES]
 
 #define STACK_SIZE 1024
+
+#define DELTA_MOTOR 16
 
 #define PRIO_UPDATE_PWM			10
 #define PRIO_DECODER_ERROR		20
@@ -39,7 +42,7 @@ static unsigned int stk_button_dec[STACK_SIZE];
 
 unsigned char err;
 uint16_t throttle;
-uint16_t speed;
+uint16_t speed, prev_decoder;
 int dec_count;
 char new_a, new_b;
 char state_a, state_b;
