@@ -12,15 +12,22 @@ void    isr_buttons(void)
 
         switch (X32_BUTTONS){
         	case 0x01: //INCREMENT THROTTLE
-        		OSSemPost(sem_button_inc);
-				//printf("post sem_inc\r\n");
+                if (interrupt_enable_register & BUTTON_INC_ENABLE){
+                    interrupt_enable_register = interrupt_enable_register & ~BUTTON_INC_ENABLE;
+                    OSSemPost(sem_button_inc);
+                }
         		break;
-        	case 0x02: //DECREMENT THROTTLE
-                OSSemPost(sem_button_dec);
-				//printf("decrement throttle\r\n");
+            case 0x02: //DECREMENT THROTTLE
+                if (interrupt_enable_register & BUTTON_DEC_ENABLE){
+                    interrupt_enable_register = interrupt_enable_register & ~BUTTON_DEC_ENABLE;
+                    OSSemPost(sem_button_dec);
+                }
         		break;         	        	
-        	case 0x04: //DISENGAGE
-                OSSemPost(sem_button_eng);
+            case 0x04: //DISENGAGE
+                if (interrupt_enable_register & BUTTON_ENG_ENABLE){
+                    interrupt_enable_register = interrupt_enable_register & ~BUTTON_ENG_ENABLE;
+                    OSSemPost(sem_button_eng);
+                }
         		break;       	
         	case 0x08: //RESET
                 OSSemPost(sem_button_res);
@@ -46,11 +53,10 @@ void isr_engine_error() {
 void decoder_error(void *data) {
     while(TRUE) {
         OSSemPend(sem_error, WAIT_FOREVER, &err);
-        //printf("pend error\r\n");
         while(OSSemAccept(sem_error) > 0);
-        //X32_LEDS = (X32_LEDS | 0x80);
+        X32_LEDS = (X32_LEDS | LED_ERROR);
         OSTimeDly(5);
-        X32_LEDS = (X32_LEDS & 0x7F);
+        X32_LEDS = (X32_LEDS & ~LED_ERROR);
     }
 }
 
@@ -88,30 +94,35 @@ void calculate_speed(void *data) {
  */
 void button_inc(void *data) {
 	while(TRUE) {
-		OSSemPend(sem_button_inc, WAIT_FOREVER, &err);		
-		OSTimeDly(10);
-		//printf("task button\r\n");
-		while(OSSemAccept(sem_button_inc) > 0);
-        throttle += DELTA_MOTOR;
-		//printf("increment throttle\r\n");
+        OSSemPend(sem_button_inc, WAIT_FOREVER, &err);
+        OSTimeDly(2);
+        if (X32_BUTTONS & 0x01){
+            throttle += DELTA_MOTOR;
+        }
+        interrupt_enable_register = interrupt_enable_register | BUTTON_INC_ENABLE;
 	}
 }
 
 void button_dec(void *data) {
-	while(TRUE) {
-		OSSemPend(sem_button_dec, WAIT_FOREVER, &err);		
-		OSTimeDly(10);
-		while(OSSemAccept(sem_button_dec) > 0);
-        throttle -= DELTA_MOTOR;
-	}
+    while(TRUE) {
+        OSSemPend(sem_button_dec, WAIT_FOREVER, &err);
+        OSTimeDly(2);
+        if (X32_BUTTONS & 0x02){
+            throttle -= DELTA_MOTOR;
+        }
+        interrupt_enable_register = interrupt_enable_register | BUTTON_DEC_ENABLE;
+    }
 }
 
 void button_eng(void *data) {
-	while(TRUE) {
-		OSSemPend(sem_button_eng, WAIT_FOREVER, &err);		
-		OSTimeDly(10);
-		while(OSSemAccept(sem_button_eng) > 0);
-	}
+    while(TRUE) {
+        OSSemPend(sem_button_eng, WAIT_FOREVER, &err);
+        OSTimeDly(2);
+        if (X32_BUTTONS & 0x04){
+            //
+        }
+        interrupt_enable_register = interrupt_enable_register | BUTTON_ENG_ENABLE;
+    }
 }
 
 void button_res(void *data) {
@@ -137,6 +148,7 @@ void main()
 	dec_count = 0;
 	speed = 0;
     prev_decoder = 0;
+    interrupt_enable_register = 0xFF;
 
 	/* x32 section********************************/
 	

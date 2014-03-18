@@ -29,6 +29,13 @@
 #define PRIO_BUTTON_ENG			34
 #define PRIO_BUTTON_RES			35
 
+#define BUTTON_INC_ENABLE		0x01
+#define BUTTON_DEC_ENABLE		0x02
+#define BUTTON_ENG_ENABLE		0x04
+#define BUTTON_RES_ENABLE		0x08
+
+#define LED_ERROR       		0x80
+
  #include "stdint.h"
 
 static unsigned int stk_update_pwm[STACK_SIZE];
@@ -46,6 +53,7 @@ uint16_t speed, prev_decoder;
 int dec_count;
 char new_a, new_b;
 char state_a, state_b;
+char interrupt_enable_register;
 
 OS_EVENT *sem_error;
 OS_EVENT *sem_button_inc;
