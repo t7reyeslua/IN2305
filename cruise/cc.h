@@ -29,6 +29,11 @@
 #define PRIO_BUTTON_ENG			34
 #define PRIO_BUTTON_RES			35
 
+#define PRIO_BUTTON_INC_AUTO	36
+#define PRIO_BUTTON_DEC_AUTO	37
+#define PRIO_BUTTON_ENG_AUTO	38
+#define PRIO_BUTTON_RES_AUTO	39
+
 #define BUTTON_INC_ENABLE		0x01
 #define BUTTON_DEC_ENABLE		0x02
 #define BUTTON_ENG_ENABLE		0x04
@@ -47,6 +52,9 @@ static unsigned int stk_button_eng[STACK_SIZE];
 static unsigned int stk_button_inc[STACK_SIZE];
 static unsigned int stk_button_dec[STACK_SIZE];
 
+static unsigned int stk_button_inc_auto[STACK_SIZE];
+static unsigned int stk_button_dec_auto[STACK_SIZE];
+
 unsigned char err;
 uint16_t throttle;
 uint16_t speed, prev_decoder;
@@ -60,5 +68,7 @@ OS_EVENT *sem_button_inc;
 OS_EVENT *sem_button_dec;
 OS_EVENT *sem_button_eng;
 OS_EVENT *sem_button_res;
+OS_EVENT *sem_button_inc_auto;
+OS_EVENT *sem_button_dec_auto;
 
  #endif      /* __IN2305_CC__ */

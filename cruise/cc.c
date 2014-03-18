@@ -98,6 +98,7 @@ void button_inc(void *data) {
         OSTimeDly(2);
         if (X32_BUTTONS & 0x01){
             throttle += DELTA_MOTOR;
+            OSSemPost(sem_button_inc_auto);
         }
         interrupt_enable_register = interrupt_enable_register | BUTTON_INC_ENABLE;
 	}
@@ -109,6 +110,7 @@ void button_dec(void *data) {
         OSTimeDly(2);
         if (X32_BUTTONS & 0x02){
             throttle -= DELTA_MOTOR;
+            OSSemPost(sem_button_dec_auto);
         }
         interrupt_enable_register = interrupt_enable_register | BUTTON_DEC_ENABLE;
     }
@@ -136,6 +138,33 @@ void button_res(void *data) {
         exit(0);
 	}
 }
+
+/*------------------------------------------------------------------
+ * automatic increment/decrement buttons --
+ *------------------------------------------------------------------
+ */
+void button_inc_auto(void *data) {
+    while(TRUE) {
+        OSSemPend(sem_button_inc_auto, WAIT_FOREVER, &err);
+        OSTimeDly(25);
+        while (X32_BUTTONS & 0x01){
+            throttle += DELTA_MOTOR;
+            OSTimeDly(1);
+        }
+    }
+}
+
+void button_dec_auto(void *data) {
+    while(TRUE) {
+        OSSemPend(sem_button_dec_auto, WAIT_FOREVER, &err);
+        OSTimeDly(25);
+        while (X32_BUTTONS & 0x02){
+            throttle -= DELTA_MOTOR;
+            OSTimeDly(1);
+        }
+    }
+}
+
 
 /*------------------------------------------------------------------
  * main
@@ -169,10 +198,14 @@ void main()
 	OSInit();
 	/*Initialize tasks*/
 	sem_error = OSSemCreate(0);
+
 	sem_button_inc = OSSemCreate(0);
 	sem_button_dec = OSSemCreate(0);
 	sem_button_eng = OSSemCreate(0);
 	sem_button_res = OSSemCreate(0);
+
+    sem_button_inc_auto = OSSemCreate(0);
+    sem_button_dec_auto = OSSemCreate(0);
 
 	OSTaskCreate(update_pwm, (void *)1024, (void *)stk_update_pwm, PRIO_UPDATE_PWM);
 	OSTaskCreate(decoder_error, (void *)0, (void *)stk_decoder_error, PRIO_DECODER_ERROR);
@@ -182,6 +215,9 @@ void main()
 	OSTaskCreate(button_dec, (void *)0, (void *)stk_button_dec, PRIO_BUTTON_DEC);
 	OSTaskCreate(button_eng, (void *)0, (void *)stk_button_eng, PRIO_BUTTON_ENG);
 	OSTaskCreate(button_res, (void *)0, (void *)stk_button_res, PRIO_BUTTON_RES);
+
+    OSTaskCreate(button_inc_auto, (void *)0, (void *)stk_button_inc_auto, PRIO_BUTTON_INC_AUTO);
+    OSTaskCreate(button_dec_auto, (void *)0, (void *)stk_button_dec_auto, PRIO_BUTTON_DEC_AUTO);
 
 	/*Initialize rtos*/
 	OSStart();
