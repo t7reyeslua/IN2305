@@ -21,9 +21,11 @@
 #define DELTA_MOTOR 16
 
 #define PRIO_CALCULATE_SPEED	5
+#define PRIO_CRUISE_CTR_PID    	9
 #define PRIO_CRUISE_CTR     	10
 #define PRIO_UPDATE_PWM			15
 #define PRIO_DECODER_ERROR		20
+#define PRIO_MONITOR        	30
 
 #define PRIO_BUTTON_INC			32
 #define PRIO_BUTTON_DEC			33
@@ -43,7 +45,7 @@
 #define LED_ERROR       		0x80
 #define LED_CC             		0x40
 
- #include "stdint.h"
+#include "stdint.h"
 
 static unsigned int stk_update_pwm[STACK_SIZE];
 static unsigned int stk_decoder_error[STACK_SIZE];
@@ -58,12 +60,17 @@ static unsigned int stk_button_inc_auto[STACK_SIZE];
 static unsigned int stk_button_dec_auto[STACK_SIZE];
 
 static unsigned int stk_cruise_controller[STACK_SIZE];
+static unsigned int stk_cruise_controller_pid[STACK_SIZE];
+
+static unsigned int stk_monitor[STACK_SIZE];
 
 unsigned char err;
-uint16_t throttle, setpoint;
-uint16_t control_enable;
-uint16_t speed, prev_decoder;
+int throttle, setpoint;
+int control_enable;
+int speed, prev_decoder;
 int dec_count, eps;
+int P, I, D;
+int last_eps, lastlast_eps;
 char new_a, new_b;
 char state_a, state_b;
 char interrupt_enable_register;

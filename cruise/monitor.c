@@ -31,9 +31,10 @@ char    ARROW_DN = 0x42;
 
 char        string[MAXLEN];
 char        history[MAXHIST][MAXLEN];
-int     hist_last, hist_size;
+int         hist_last, hist_size;
 char        command[MAXLEN];
-int     argc;
+int         argc;
+
 #define MAXARGC 4
 char        *argv[MAXARGC];
 

@@ -1,6 +1,7 @@
 #include "x32.h"
 #include "ucos.h"
 #include "cc.h"
+#include "monitor.h"
 
 /*------------------------------------------------------------------
  * isr_buttons -- buttons interrupt service routine
@@ -93,10 +94,35 @@ void cruise_controller(void *data) {
     while(TRUE) {
         eps = setpoint - speed;
         throttle += eps/4;
+        printf("%d %d %d %d\n",++t, setpoint, throttle, speed);
         OSTimeDly(1);
      }
 }
 
+void cruise_controller_pid(void *data) {
+    while(TRUE) {
+        eps = setpoint - speed;
+        throttle += (P * ((eps - last_eps) + I * eps + D * (eps - 2 * last_eps + lastlast_eps)))/64;
+
+        if (throttle < 0)
+            throttle = 0;
+        else if (throttle > 1024)
+            throttle = 1024;
+
+        lastlast_eps = last_eps;
+        last_eps = eps;
+
+        printf("%d %d %d %d\n",++t, setpoint, throttle, speed);
+        OSTimeDly(1);
+     }
+}
+
+void cc_monitor(void *data) {
+    while(TRUE) {
+        run_monitor();
+        OSTimeDly(500);
+     }
+}
 
 /*------------------------------------------------------------------
  * parallel debouncing of buttons --
@@ -191,23 +217,27 @@ void button_dec_auto(void *data) {
  */
 void main()
 {
-	/* Init variables*****************************/
-	throttle = 0;
-	dec_count = 0;
-	speed = 0;
+    /* Init variables*****************************/
+    throttle = 0x31323334;
+    dec_count = 0;
+    speed = 0;
     prev_decoder = 0;
     interrupt_enable_register = (char)0xFF;
     control_enable = 0;
     setpoint = 0;
     eps = 0;
+    time = 0;
     X32_LEDS = 0;
 
-	/* x32 section********************************/
-	
-    /**Define x32 ISR vectors, priorities,etc.*/
-	DISABLE_INTERRUPT(INTERRUPT_GLOBAL);
+    P = 1;
+    I = 1;
+    D = 1;
+    /* x32 section********************************/
 
-	SET_INTERRUPT_VECTOR(INTERRUPT_BUTTONS, &isr_buttons);
+    /**Define x32 ISR vectors, priorities,etc.*/
+    DISABLE_INTERRUPT(INTERRUPT_GLOBAL);
+
+    SET_INTERRUPT_VECTOR(INTERRUPT_BUTTONS, &isr_buttons);
     SET_INTERRUPT_PRIORITY(INTERRUPT_BUTTONS, 10);
 
     SET_INTERRUPT_VECTOR(INTERRUPT_ENGINE_ERROR, &isr_engine_error);
@@ -217,32 +247,34 @@ void main()
     ENABLE_INTERRUPT(INTERRUPT_BUTTONS);
 
 
-	/* RTOS ucOS section**************************/
-	OSInit();
-	/*Initialize tasks*/
-	sem_error = OSSemCreate(0);
+    /* RTOS ucOS section**************************/
+    OSInit();
+    /*Initialize tasks*/
+    sem_error = OSSemCreate(0);
 
-	sem_button_inc = OSSemCreate(0);
-	sem_button_dec = OSSemCreate(0);
-	sem_button_eng = OSSemCreate(0);
-	sem_button_res = OSSemCreate(0);
+    sem_button_inc = OSSemCreate(0);
+    sem_button_dec = OSSemCreate(0);
+    sem_button_eng = OSSemCreate(0);
+    sem_button_res = OSSemCreate(0);
 
     sem_button_inc_auto = OSSemCreate(0);
     sem_button_dec_auto = OSSemCreate(0);
 
-	OSTaskCreate(update_pwm, (void *)1024, (void *)stk_update_pwm, PRIO_UPDATE_PWM);
-	OSTaskCreate(decoder_error, (void *)0, (void *)stk_decoder_error, PRIO_DECODER_ERROR);
-	OSTaskCreate(calculate_speed, (void *)0, (void *)stk_calculate_speed, PRIO_CALCULATE_SPEED);
-    OSTaskCreate(cruise_controller, (void *)0, (void *)stk_cruise_controller, PRIO_CRUISE_CTR);
+    OSTaskCreate(update_pwm, (void *)1024, (void *)stk_update_pwm, PRIO_UPDATE_PWM);
+    OSTaskCreate(decoder_error, (void *)0, (void *)stk_decoder_error, PRIO_DECODER_ERROR);
+    OSTaskCreate(calculate_speed, (void *)0, (void *)stk_calculate_speed, PRIO_CALCULATE_SPEED);
+    OSTaskCreate(cruise_controller, (void *)0, (void *)stk_cruise_controller_pid, PRIO_CRUISE_CTR_PID);
 
-	OSTaskCreate(button_inc, (void *)0, (void *)stk_button_inc, PRIO_BUTTON_INC);
-	OSTaskCreate(button_dec, (void *)0, (void *)stk_button_dec, PRIO_BUTTON_DEC);
-	OSTaskCreate(button_eng, (void *)0, (void *)stk_button_eng, PRIO_BUTTON_ENG);
-	OSTaskCreate(button_res, (void *)0, (void *)stk_button_res, PRIO_BUTTON_RES);
+    OSTaskCreate(button_inc, (void *)0, (void *)stk_button_inc, PRIO_BUTTON_INC);
+    OSTaskCreate(button_dec, (void *)0, (void *)stk_button_dec, PRIO_BUTTON_DEC);
+    OSTaskCreate(button_eng, (void *)0, (void *)stk_button_eng, PRIO_BUTTON_ENG);
+    OSTaskCreate(button_res, (void *)0, (void *)stk_button_res, PRIO_BUTTON_RES);
 
     OSTaskCreate(button_inc_auto, (void *)0, (void *)stk_button_inc_auto, PRIO_BUTTON_INC_AUTO);
     OSTaskCreate(button_dec_auto, (void *)0, (void *)stk_button_dec_auto, PRIO_BUTTON_DEC_AUTO);
 
-	/*Initialize rtos*/
-	OSStart();
+    OSTaskCreate(cc_monitor, (void *)0, (void *)stk_monitor, PRIO_MONITOR);
+
+    /*Initialize rtos*/
+    OSStart();
 }
