@@ -88,6 +88,16 @@ void calculate_speed(void *data) {
      }
 }
 
+
+void cruise_controller(void *data) {
+    while(TRUE) {
+        eps = setpoint - speed;
+        throttle += eps/4;
+        OSTimeDly(1);
+     }
+}
+
+
 /*------------------------------------------------------------------
  * parallel debouncing of buttons --
  *------------------------------------------------------------------
@@ -98,7 +108,8 @@ void button_inc(void *data) {
         OSTimeDly(2);
         if (X32_BUTTONS & 0x01){
             throttle += DELTA_MOTOR;
-            OSSemPost(sem_button_inc_auto);
+            if (control_enable == 0)
+                OSSemPost(sem_button_inc_auto);
         }
         interrupt_enable_register = interrupt_enable_register | BUTTON_INC_ENABLE;
 	}
@@ -110,7 +121,8 @@ void button_dec(void *data) {
         OSTimeDly(2);
         if (X32_BUTTONS & 0x02){
             throttle -= DELTA_MOTOR;
-            OSSemPost(sem_button_dec_auto);
+            if (control_enable == 0)
+                OSSemPost(sem_button_dec_auto);
         }
         interrupt_enable_register = interrupt_enable_register | BUTTON_DEC_ENABLE;
     }
@@ -121,7 +133,14 @@ void button_eng(void *data) {
         OSSemPend(sem_button_eng, WAIT_FOREVER, &err);
         OSTimeDly(2);
         if (X32_BUTTONS & 0x04){
-            //
+            if (control_enable == 0){
+                control_enable = 1;
+                setpoint = speed;
+                X32_LEDS = (X32_LEDS | LED_ERROR);
+            }else{
+                control_enable = 0;
+                X32_LEDS = (X32_LEDS & ~LED_ERROR);
+            }
         }
         interrupt_enable_register = interrupt_enable_register | BUTTON_ENG_ENABLE;
     }
@@ -177,7 +196,11 @@ void main()
 	dec_count = 0;
 	speed = 0;
     prev_decoder = 0;
-    interrupt_enable_register = 0xFF;
+    interrupt_enable_register = (char)0xFF;
+    control_enable = 0;
+    setpoint = 0;
+    eps = 0;
+    X32_LEDS = 0;
 
 	/* x32 section********************************/
 	
@@ -210,6 +233,7 @@ void main()
 	OSTaskCreate(update_pwm, (void *)1024, (void *)stk_update_pwm, PRIO_UPDATE_PWM);
 	OSTaskCreate(decoder_error, (void *)0, (void *)stk_decoder_error, PRIO_DECODER_ERROR);
 	OSTaskCreate(calculate_speed, (void *)0, (void *)stk_calculate_speed, PRIO_CALCULATE_SPEED);
+    OSTaskCreate(cruise_controller, (void *)0, (void *)stk_cruise_controller, PRIO_CRUISE_CTR);
 
 	OSTaskCreate(button_inc, (void *)0, (void *)stk_button_inc, PRIO_BUTTON_INC);
 	OSTaskCreate(button_dec, (void *)0, (void *)stk_button_dec, PRIO_BUTTON_DEC);
