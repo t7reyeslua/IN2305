@@ -70,20 +70,24 @@ void update_pwm(void *data) {
     while(TRUE) {
             int s = (speed<<4) & 0xff00;
             X32_PWM_WIDTH = throttle;
+
             if (X32_SWITCHES == 0x00){
                 X32_DISPLAY = (s)|(throttle>>4);
-            }else if (X32_SWITCHES == 0x01){
+            }else if (X32_SWITCHES == 0x02){
                 X32_DISPLAY = (speed);
-            }else{
+            }else if (X32_SWITCHES == 0x01){
                 X32_DISPLAY = (throttle);
+            }else{
+                X32_DISPLAY = (setpoint);
             }
             OSTimeDly(1);
        }
 }
 
 void calculate_speed(void *data) {
-	while(TRUE) {	
-        speed = X32_DECODER - prev_decoder;
+    while(TRUE) {
+        speed = (X32_DECODER - prev_decoder)/2;
+        speed = speed & 0x7fff;
         prev_decoder = X32_DECODER;
         OSTimeDly(5);
      }
@@ -92,10 +96,11 @@ void calculate_speed(void *data) {
 
 void cruise_controller(void *data) {
     while(TRUE) {
-        eps = setpoint - speed;
-        throttle += eps/4;
-        printf("%d %d %d %d\n",++t, setpoint, throttle, speed);
-        OSTimeDly(1);
+        if  (control_enable == 1){
+            eps = setpoint - speed;
+            throttle += eps/4;
+        }
+        OSTimeDly(2);
      }
 }
 
@@ -112,7 +117,7 @@ void cruise_controller_pid(void *data) {
         lastlast_eps = last_eps;
         last_eps = eps;
 
-        printf("%d %d %d %d\n",++t, setpoint, throttle, speed);
+        printf("%d %d %d %d\n",++time, setpoint, throttle, speed);
         OSTimeDly(1);
      }
 }
@@ -124,21 +129,25 @@ void cc_monitor(void *data) {
      }
 }
 
+
 /*------------------------------------------------------------------
  * parallel debouncing of buttons --
  *------------------------------------------------------------------
  */
 void button_inc(void *data) {
-	while(TRUE) {
+    while(TRUE) {
         OSSemPend(sem_button_inc, WAIT_FOREVER, &err);
         OSTimeDly(2);
         if (X32_BUTTONS & 0x01){
-            throttle += DELTA_MOTOR;
+            if (throttle <= (TOP_SPEED - DELTA_MOTOR)){
+                throttle += DELTA_MOTOR;
+                setpoint += DELTA_MOTOR;
+            }
             if (control_enable == 0)
                 OSSemPost(sem_button_inc_auto);
         }
         interrupt_enable_register = interrupt_enable_register | BUTTON_INC_ENABLE;
-	}
+    }
 }
 
 void button_dec(void *data) {
@@ -146,7 +155,10 @@ void button_dec(void *data) {
         OSSemPend(sem_button_dec, WAIT_FOREVER, &err);
         OSTimeDly(2);
         if (X32_BUTTONS & 0x02){
-            throttle -= DELTA_MOTOR;
+            if (throttle >= DELTA_MOTOR){
+                throttle -= DELTA_MOTOR;
+                setpoint -= DELTA_MOTOR;
+            }
             if (control_enable == 0)
                 OSSemPost(sem_button_dec_auto);
         }
@@ -173,15 +185,16 @@ void button_eng(void *data) {
 }
 
 void button_res(void *data) {
-	while(TRUE) {
-		OSSemPend(sem_button_res, WAIT_FOREVER, &err);		
-		OSTimeDly(10);
-		while(OSSemAccept(sem_button_res) > 0);
-		
-		DISABLE_INTERRUPT(INTERRUPT_GLOBAL);
+    while(TRUE) {
+        OSSemPend(sem_button_res, WAIT_FOREVER, &err);
+        OSTimeDly(10);
+        while(OSSemAccept(sem_button_res) > 0);
+        X32_DISPLAY = 0;
+        X32_PWM_WIDTH = 0;
+        DISABLE_INTERRUPT(INTERRUPT_GLOBAL);
         printf("regular exit\r\n");
         exit(0);
-	}
+    }
 }
 
 /*------------------------------------------------------------------
@@ -193,7 +206,8 @@ void button_inc_auto(void *data) {
         OSSemPend(sem_button_inc_auto, WAIT_FOREVER, &err);
         OSTimeDly(25);
         while (X32_BUTTONS & 0x01){
-            throttle += DELTA_MOTOR;
+            if (throttle <= (TOP_SPEED - DELTA_MOTOR))
+                throttle += DELTA_MOTOR;
             OSTimeDly(1);
         }
     }
@@ -204,7 +218,8 @@ void button_dec_auto(void *data) {
         OSSemPend(sem_button_dec_auto, WAIT_FOREVER, &err);
         OSTimeDly(25);
         while (X32_BUTTONS & 0x02){
-            throttle -= DELTA_MOTOR;
+            if (throttle >= DELTA_MOTOR)
+                throttle -= DELTA_MOTOR;
             OSTimeDly(1);
         }
     }
@@ -218,7 +233,7 @@ void button_dec_auto(void *data) {
 void main()
 {
     /* Init variables*****************************/
-    throttle = 0x31323334;
+    throttle = 0;
     dec_count = 0;
     speed = 0;
     prev_decoder = 0;
@@ -263,7 +278,7 @@ void main()
     OSTaskCreate(update_pwm, (void *)1024, (void *)stk_update_pwm, PRIO_UPDATE_PWM);
     OSTaskCreate(decoder_error, (void *)0, (void *)stk_decoder_error, PRIO_DECODER_ERROR);
     OSTaskCreate(calculate_speed, (void *)0, (void *)stk_calculate_speed, PRIO_CALCULATE_SPEED);
-    OSTaskCreate(cruise_controller, (void *)0, (void *)stk_cruise_controller_pid, PRIO_CRUISE_CTR_PID);
+    OSTaskCreate(cruise_controller, (void *)0, (void *)stk_cruise_controller, PRIO_CRUISE_CTR);
 
     OSTaskCreate(button_inc, (void *)0, (void *)stk_button_inc, PRIO_BUTTON_INC);
     OSTaskCreate(button_dec, (void *)0, (void *)stk_button_dec, PRIO_BUTTON_DEC);
@@ -273,7 +288,7 @@ void main()
     OSTaskCreate(button_inc_auto, (void *)0, (void *)stk_button_inc_auto, PRIO_BUTTON_INC_AUTO);
     OSTaskCreate(button_dec_auto, (void *)0, (void *)stk_button_dec_auto, PRIO_BUTTON_DEC_AUTO);
 
-    OSTaskCreate(cc_monitor, (void *)0, (void *)stk_monitor, PRIO_MONITOR);
+    //OSTaskCreate(cc_monitor, (void *)0, (void *)stk_monitor, PRIO_MONITOR);
 
     /*Initialize rtos*/
     OSStart();

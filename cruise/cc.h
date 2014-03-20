@@ -18,12 +18,12 @@
 
 #define STACK_SIZE 1024
 
-#define DELTA_MOTOR 16
+#define DELTA_MOTOR 1
 
 #define PRIO_CALCULATE_SPEED	5
 #define PRIO_CRUISE_CTR_PID    	9
 #define PRIO_CRUISE_CTR     	10
-#define PRIO_UPDATE_PWM			15
+#define PRIO_UPDATE_PWM			3
 #define PRIO_DECODER_ERROR		20
 #define PRIO_MONITOR        	30
 
@@ -44,6 +44,8 @@
 
 #define LED_ERROR       		0x80
 #define LED_CC             		0x40
+
+#define TOP_SPEED               1024
 
 #include "stdint.h"
 
@@ -70,6 +72,7 @@ int control_enable;
 int speed, prev_decoder;
 int dec_count, eps;
 int P, I, D;
+int time;
 int last_eps, lastlast_eps;
 char new_a, new_b;
 char state_a, state_b;
