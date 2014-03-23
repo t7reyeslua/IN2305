@@ -6,14 +6,14 @@
 
 /* define some peripheral short hands
  */
-#define X32_DISPLAY				peripherals[PERIPHERAL_DISPLAY]
-#define X32_LEDS				peripherals[PERIPHERAL_LEDS]
-#define X32_BUTTONS				peripherals[PERIPHERAL_BUTTONS]
-#define X32_MS					peripherals[PERIPHERAL_MS_CLOCK] 
-#define X32_US					peripherals[PERIPHERAL_US_CLOCK]
-#define X32_DECODER				peripherals[PERIPHERAL_ENGINE_DECODED]
-#define X32_PWM_PERIOD 			peripherals[PERIPHERAL_DPC1_PERIOD]
-#define X32_PWM_WIDTH  			peripherals[PERIPHERAL_DPC1_WIDTH]
+#define X32_DISPLAY			peripherals[PERIPHERAL_DISPLAY]
+#define X32_LEDS			peripherals[PERIPHERAL_LEDS]
+#define X32_BUTTONS			peripherals[PERIPHERAL_BUTTONS]
+#define X32_MS				peripherals[PERIPHERAL_MS_CLOCK]
+#define X32_US				peripherals[PERIPHERAL_US_CLOCK]
+#define X32_DECODER			peripherals[PERIPHERAL_ENGINE_DECODED]
+#define X32_PWM_PERIOD			peripherals[PERIPHERAL_DPC1_PERIOD]
+#define X32_PWM_WIDTH			peripherals[PERIPHERAL_DPC1_WIDTH]
 #define X32_SWITCHES  			peripherals[PERIPHERAL_SWITCHES]
 
 #define STACK_SIZE 1024
@@ -22,7 +22,7 @@
 
 #define PRIO_UPDATE_PWM			10
 #define PRIO_DECODER_ERROR		20
-#define PRIO_CALCULATE_SPEED	30
+#define PRIO_CALCULATE_SPEED		30
 
 #define PRIO_BUTTON_INC			32
 #define PRIO_BUTTON_DEC			33
@@ -36,7 +36,7 @@
 
 #define LED_ERROR       		0x80
 
- #include "stdint.h"
+#include "stdint.h"
 
 static unsigned int stk_update_pwm[STACK_SIZE];
 static unsigned int stk_decoder_error[STACK_SIZE];
@@ -54,6 +54,7 @@ int dec_count;
 char new_a, new_b;
 char state_a, state_b;
 char interrupt_enable_register;
+int buttons_flag;
 
 OS_EVENT *sem_error;
 OS_EVENT *sem_button_inc;
