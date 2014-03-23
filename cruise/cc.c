@@ -1,3 +1,13 @@
+/**
+ * cc.c - Motor speed controller
+ *
+ * TI2725-C Embedded Software Lab - Day 3
+ *
+ * Group 11
+ *	Student 1: Antonio Reyes 4332431
+ *	Student 2: Andres Moreno 4311035
+ */
+
 #include "x32.h"
 #include "ucos.h"
 #include "cc.h"
@@ -9,40 +19,41 @@
  */
 void    isr_buttons(void)
 {
-        OSIntEnter();
+	int changes;
+	OSIntEnter();
+	changes = (buttons_flag ^ X32_BUTTONS);
 
-        switch (X32_BUTTONS){
-        	case 0x01: //INCREMENT THROTTLE
-                if (interrupt_enable_register & BUTTON_INC_ENABLE){
-                    interrupt_enable_register = interrupt_enable_register & ~BUTTON_INC_ENABLE;
-                    OSSemPost(sem_button_inc);
-                }
-        		break;
-            case 0x02: //DECREMENT THROTTLE
-                if (interrupt_enable_register & BUTTON_DEC_ENABLE){
-                    interrupt_enable_register = interrupt_enable_register & ~BUTTON_DEC_ENABLE;
-                    OSSemPost(sem_button_dec);
-                }
-        		break;         	        	
-            case 0x04: //DISENGAGE
-                if (interrupt_enable_register & BUTTON_ENG_ENABLE){
-                    interrupt_enable_register = interrupt_enable_register & ~BUTTON_ENG_ENABLE;
-                    OSSemPost(sem_button_eng);
-                }
-        		break;       	
-        	case 0x08: //RESET
-                OSSemPost(sem_button_res);
-        		break;
-        	default:
-        		break;
+	if (changes & 0x1) {
+		if (interrupt_enable_register & BUTTON_INC_ENABLE){
+			interrupt_enable_register = interrupt_enable_register & ~BUTTON_INC_ENABLE;
+			OSSemPost(sem_button_inc);
+		}
+	}
 
-        } 
+	if (changes & 0x2) {
+		if (interrupt_enable_register & BUTTON_DEC_ENABLE){
+			interrupt_enable_register = interrupt_enable_register & ~BUTTON_DEC_ENABLE;
+			OSSemPost(sem_button_dec);
+		}
+	}
 
-        OSIntExit();
+	if (changes & 0x4) {
+		if (interrupt_enable_register & BUTTON_ENG_ENABLE){
+			interrupt_enable_register = interrupt_enable_register & ~BUTTON_ENG_ENABLE;
+			OSSemPost(sem_button_eng);
+		}
+	}
+
+	if (changes & 0x8) {
+		OSSemPost(sem_button_res);
+
+	}
+	buttons_flag = X32_BUTTONS;
+	OSIntExit();
 }
 
 /*------------------------------------------------------------------
- * Engine_error
+ * isr_engine_error
  *------------------------------------------------------------------
  */
 void isr_engine_error() {
@@ -51,6 +62,10 @@ void isr_engine_error() {
     OSIntExit();
 }
 
+/*------------------------------------------------------------------
+ * decoder_error -- Turn on led 7 on decoder error
+ *------------------------------------------------------------------
+ */
 void decoder_error(void *data) {
     while(TRUE) {
         OSSemPend(sem_error, WAIT_FOREVER, &err);
@@ -62,7 +77,7 @@ void decoder_error(void *data) {
 }
 
 /*------------------------------------------------------------------
- * Speed calculations
+ * update_pwm -- Set throttle and shows speed/throttle on display
  *------------------------------------------------------------------
  */
 void update_pwm(void *data) {
@@ -83,7 +98,10 @@ void update_pwm(void *data) {
             OSTimeDly(1);
        }
 }
-
+/*------------------------------------------------------------------
+ * calculate_speed -- Counts steps in a lapse of time (100ms)
+ *------------------------------------------------------------------
+ */
 void calculate_speed(void *data) {
     while(TRUE) {
         speed = (X32_DECODER - prev_decoder)/2;
@@ -93,7 +111,10 @@ void calculate_speed(void *data) {
      }
 }
 
-
+/*------------------------------------------------------------------
+ * cruise_controller -- Simple cruise controller
+ *------------------------------------------------------------------
+ */
 void cruise_controller(void *data) {
     while(TRUE) {
         if  (control_enable == 1){
@@ -104,6 +125,10 @@ void cruise_controller(void *data) {
      }
 }
 
+/*------------------------------------------------------------------
+ * cruise_controller_pid -- PID cruise controller
+ *------------------------------------------------------------------
+ */
 void cruise_controller_pid(void *data) {
     while(TRUE) {
         eps = setpoint - speed;
@@ -122,6 +147,10 @@ void cruise_controller_pid(void *data) {
      }
 }
 
+/*------------------------------------------------------------------
+ * cc_monitor -- monitoring task
+ *------------------------------------------------------------------
+ */
 void cc_monitor(void *data) {
     while(TRUE) {
         run_monitor();
@@ -131,7 +160,7 @@ void cc_monitor(void *data) {
 
 
 /*------------------------------------------------------------------
- * parallel debouncing of buttons --
+ * button_inc -- Increment throttle
  *------------------------------------------------------------------
  */
 void button_inc(void *data) {
@@ -150,6 +179,26 @@ void button_inc(void *data) {
     }
 }
 
+/*------------------------------------------------------------------
+ * button_inc_auto -- automatic increment throttle
+ *------------------------------------------------------------------
+ */
+void button_inc_auto(void *data) {
+    while(TRUE) {
+	OSSemPend(sem_button_inc_auto, WAIT_FOREVER, &err);
+	OSTimeDly(25);
+	while (X32_BUTTONS & 0x01){
+	    if (throttle <= (TOP_SPEED - DELTA_MOTOR))
+		throttle += DELTA_MOTOR;
+	    OSTimeDly(1);
+	}
+    }
+}
+
+/*------------------------------------------------------------------
+ * button_dec -- Decrement throttle
+ *------------------------------------------------------------------
+ */
 void button_dec(void *data) {
     while(TRUE) {
         OSSemPend(sem_button_dec, WAIT_FOREVER, &err);
@@ -166,6 +215,26 @@ void button_dec(void *data) {
     }
 }
 
+/*------------------------------------------------------------------
+ * button_dec_auto -- automatic decrement throttle
+ *------------------------------------------------------------------
+ */
+void button_dec_auto(void *data) {
+    while(TRUE) {
+	OSSemPend(sem_button_dec_auto, WAIT_FOREVER, &err);
+	OSTimeDly(25);
+	while (X32_BUTTONS & 0x02){
+	    if (throttle >= DELTA_MOTOR)
+		throttle -= DELTA_MOTOR;
+	    OSTimeDly(1);
+	}
+    }
+}
+
+/*------------------------------------------------------------------
+ * button_eng -- Future engage/disengage
+ *------------------------------------------------------------------
+ */
 void button_eng(void *data) {
     while(TRUE) {
         OSSemPend(sem_button_eng, WAIT_FOREVER, &err);
@@ -176,6 +245,7 @@ void button_eng(void *data) {
                 setpoint = speed;
                 X32_LEDS = (X32_LEDS | LED_ERROR);
             }else{
+
                 control_enable = 0;
                 X32_LEDS = (X32_LEDS & ~LED_ERROR);
             }
@@ -184,6 +254,10 @@ void button_eng(void *data) {
     }
 }
 
+/*------------------------------------------------------------------
+ * button_res -- Exit program
+ *------------------------------------------------------------------
+ */
 void button_res(void *data) {
     while(TRUE) {
         OSSemPend(sem_button_res, WAIT_FOREVER, &err);
@@ -198,41 +272,12 @@ void button_res(void *data) {
 }
 
 /*------------------------------------------------------------------
- * automatic increment/decrement buttons --
- *------------------------------------------------------------------
- */
-void button_inc_auto(void *data) {
-    while(TRUE) {
-        OSSemPend(sem_button_inc_auto, WAIT_FOREVER, &err);
-        OSTimeDly(25);
-        while (X32_BUTTONS & 0x01){
-            if (throttle <= (TOP_SPEED - DELTA_MOTOR))
-                throttle += DELTA_MOTOR;
-            OSTimeDly(1);
-        }
-    }
-}
-
-void button_dec_auto(void *data) {
-    while(TRUE) {
-        OSSemPend(sem_button_dec_auto, WAIT_FOREVER, &err);
-        OSTimeDly(25);
-        while (X32_BUTTONS & 0x02){
-            if (throttle >= DELTA_MOTOR)
-                throttle -= DELTA_MOTOR;
-            OSTimeDly(1);
-        }
-    }
-}
-
-
-/*------------------------------------------------------------------
  * main
  *------------------------------------------------------------------
  */
 void main()
 {
-    /* Init variables*****************************/
+    /* Init variables */
     throttle = 0;
     dec_count = 0;
     speed = 0;
@@ -243,13 +288,13 @@ void main()
     eps = 0;
     time = 0;
     X32_LEDS = 0;
+    buttons_flag;
 
     P = 1;
     I = 1;
     D = 1;
-    /* x32 section********************************/
 
-    /**Define x32 ISR vectors, priorities,etc.*/
+    /* Define x32 ISR vectors, priorities,etc. */
     DISABLE_INTERRUPT(INTERRUPT_GLOBAL);
 
     SET_INTERRUPT_VECTOR(INTERRUPT_BUTTONS, &isr_buttons);
@@ -262,9 +307,9 @@ void main()
     ENABLE_INTERRUPT(INTERRUPT_BUTTONS);
 
 
-    /* RTOS ucOS section**************************/
+    /* RTOS ucOS section */
     OSInit();
-    /*Initialize tasks*/
+    /* Initialize tasks */
     sem_error = OSSemCreate(0);
 
     sem_button_inc = OSSemCreate(0);
@@ -290,6 +335,6 @@ void main()
 
     //OSTaskCreate(cc_monitor, (void *)0, (void *)stk_monitor, PRIO_MONITOR);
 
-    /*Initialize rtos*/
+    /* Initialize RTOS */
     OSStart();
 }

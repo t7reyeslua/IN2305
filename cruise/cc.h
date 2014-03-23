@@ -6,12 +6,12 @@
 
 /* define some peripheral short hands
  */
-#define X32_DISPLAY				peripherals[PERIPHERAL_DISPLAY]
-#define X32_LEDS				peripherals[PERIPHERAL_LEDS]
-#define X32_BUTTONS				peripherals[PERIPHERAL_BUTTONS]
-#define X32_MS					peripherals[PERIPHERAL_MS_CLOCK] 
-#define X32_US					peripherals[PERIPHERAL_US_CLOCK]
-#define X32_DECODER				peripherals[PERIPHERAL_ENGINE_DECODED]
+#define X32_DISPLAY			peripherals[PERIPHERAL_DISPLAY]
+#define X32_LEDS			peripherals[PERIPHERAL_LEDS]
+#define X32_BUTTONS			peripherals[PERIPHERAL_BUTTONS]
+#define X32_MS				peripherals[PERIPHERAL_MS_CLOCK]
+#define X32_US				peripherals[PERIPHERAL_US_CLOCK]
+#define X32_DECODER			peripherals[PERIPHERAL_ENGINE_DECODED]
 #define X32_PWM_PERIOD 			peripherals[PERIPHERAL_DPC1_PERIOD]
 #define X32_PWM_WIDTH  			peripherals[PERIPHERAL_DPC1_WIDTH]
 #define X32_SWITCHES  			peripherals[PERIPHERAL_SWITCHES]
@@ -20,22 +20,22 @@
 
 #define DELTA_MOTOR 1
 
-#define PRIO_CALCULATE_SPEED	5
-#define PRIO_CRUISE_CTR_PID    	9
-#define PRIO_CRUISE_CTR     	10
+#define PRIO_CALCULATE_SPEED		5
+#define PRIO_CRUISE_CTR_PID		9
+#define PRIO_CRUISE_CTR			10
 #define PRIO_UPDATE_PWM			3
 #define PRIO_DECODER_ERROR		20
-#define PRIO_MONITOR        	30
+#define PRIO_MONITOR			30
 
 #define PRIO_BUTTON_INC			32
 #define PRIO_BUTTON_DEC			33
 #define PRIO_BUTTON_ENG			34
 #define PRIO_BUTTON_RES			35
 
-#define PRIO_BUTTON_INC_AUTO	36
-#define PRIO_BUTTON_DEC_AUTO	37
-#define PRIO_BUTTON_ENG_AUTO	38
-#define PRIO_BUTTON_RES_AUTO	39
+#define PRIO_BUTTON_INC_AUTO		36
+#define PRIO_BUTTON_DEC_AUTO		37
+#define PRIO_BUTTON_ENG_AUTO		38
+#define PRIO_BUTTON_RES_AUTO		39
 
 #define BUTTON_INC_ENABLE		0x01
 #define BUTTON_DEC_ENABLE		0x02
@@ -45,7 +45,7 @@
 #define LED_ERROR       		0x80
 #define LED_CC             		0x40
 
-#define TOP_SPEED               1024
+#define TOP_SPEED			1024
 
 #include "stdint.h"
 
@@ -77,6 +77,7 @@ int last_eps, lastlast_eps;
 char new_a, new_b;
 char state_a, state_b;
 char interrupt_enable_register;
+int buttons_flag;
 
 OS_EVENT *sem_error;
 OS_EVENT *sem_button_inc;
